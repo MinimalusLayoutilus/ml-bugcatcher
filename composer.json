@@ -1,0 +1,28 @@
+{
+    "name": "mnhcc/ml-bugcatcher",
+    "description": "Minimalus Layoutilus — error handler, event system and exception classes",
+    "type": "library",
+    "license": "LGPL-2.1-only",
+    "authors": [
+        {
+            "name": "Michael Hegenbarth (carschrotter)",
+            "email": "mnh@mn-hegenbarth.de"
+        }
+    ],
+    "require": {
+        "php": ">=5.4",
+        "mnhcc/ml-core": "^0.9"
+    },
+    "require-dev": {
+        "raveren/kint": "^1.0",
+        "firephp/firephp-core": "~0.3"
+    },
+    "autoload": {
+        "classmap": [
+            "classes/",
+            "interfaces/",
+            "traits/"
+        ]
+    },
+    "minimum-stability": "stable"
+}
