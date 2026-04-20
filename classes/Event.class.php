@@ -25,8 +25,8 @@ namespace mnhcc\ml\classes {
 	mnhcc\ml\traits as traits;
 
     /**
-     * Description of Event
-     * 
+     * Wraps a callable and binds it to a named event.
+     *
      * @author Michael Hegenbarth (carschrotter)
      * @package MinimalusLayoutilus
      * @copyright (c) 2013, Michael Hegenbarth
@@ -54,14 +54,18 @@ namespace mnhcc\ml\classes {
 	    }
 	}
 
+	/**
+	 * @return callable
+	 */
 	protected function getCallback() {
 	    return $this->_callback;
 	}
 
 	/**
-	 * 
-	 * @param \mnhcc\ml\classes\EventParms $eparm
-	 * @return type
+	 * Invokes the listener callback with the given event parameters.
+	 * @param EventParms $eparm
+	 * @param int        $index  Position of this listener in the event queue.
+	 * @return mixed
 	 */
 	public function raise(EventParms $eparm, $index) {
 	    $this->setEventParms($eparm);

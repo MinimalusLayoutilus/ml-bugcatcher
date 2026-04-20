@@ -22,18 +22,22 @@
 namespace mnhcc\ml\classes {
 
     /**
-     * Description of EventManager
+     * Central event dispatcher — dispatches named events to registered listeners.
      *
      * @author carschrotter
      */
     abstract class EventManager {
 
+	/**
+	 * Registered listeners keyed by normalised event name.
+	 * @var array
+	 */
 	static protected $_events = [];
 
 	/**
-	 * 
-	 * @param string $name
-	 * @param \mnhcc\ml\classes\EventParms $parms
+	 * Raises a named event, notifying all registered listeners.
+	 * @param string     $name  Event name (leading "on" is stripped automatically).
+	 * @param EventParms $parms Parameter bag passed to each listener.
 	 */
 	static public function raise($name, EventParms $parms) {
 	    $cName = self::cleanEventName($name);
@@ -45,6 +49,12 @@ namespace mnhcc\ml\classes {
 	    }
 	}
 
+	/**
+	 * Normalises an event name: strips leading "on" prefix and applies ucfirst.
+	 * @param string $name   Raw event name.
+	 * @param bool   $asKey  Return all-lowercase for use as an array key.
+	 * @return string
+	 */
 	static public function cleanEventName($name, $asKey = false) {
 	    $cleanEventName = \preg_replace("~^on~i", '', $name);
 	    if($asKey){return \strtolower($cleanEventName);}

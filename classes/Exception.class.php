@@ -26,6 +26,12 @@ namespace mnhcc\ml\classes {
 	\mnhcc\ml\interfaces,
 	\mnhcc\ml\classes\Exception;
 
+    /**
+     * Base exception class for the mnhcc framework; JSON-serialisable and MNHcC-compatible.
+     *
+     * @author Michael Hegenbarth (carschrotter)
+     * @package MinimalusLayoutilus
+     */
     class Exception extends \Exception implements \JsonSerializable, interfaces\MNHcC, interfaces\Exception {
 
 	use traits\Exception;
