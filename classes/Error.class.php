@@ -50,32 +50,34 @@ namespace mnhcc\ml\classes {
 	 * @var string 
 	 */
 	protected static $template = <<<EOF
-<!DOCTYPE html><!-- XHTML 5 -->
-<html xmlns="http://www.w3.org/1999/xhtml" lang="en" dir="ltr">
-<haed>
-	<link rel="stylesheet" href="~baseurl~assets/css/bootstrap.css" type="text/css" />
-	<link rel="stylesheet" href="~baseurl~assets/css/override.css" type="text/css" />
-	<link rel="stylesheet" href="~baseurl~assets/css/error.css" type="text/css" />
-	<link rel="stylesheet" href="~baseurl~assets/css/debug.css" type="text/css" />
-</haed>
-<body id="error">
-	<div class="container error">
-		<div class="row">
-			<div class="span12 box-outline" id="main-error-box">
-				<div class class="box-header">
-				~heading~
-				</div>
-				<div class="box-body">
-				%s
-				<p>
-				<span style="color:inherit; font-weight:900;">Last Error:</span>
-				<br /> %s <br />
-				</p>
-				</div>
-			</div>
-		</div>
-	</div>
-	<div id="placeholder">Error</div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap-theme.min.css">
+    <style>body { padding-top: 70px; padding-bottom: 40px; }</style>
+</head>
+<body>
+<nav class="navbar navbar-default navbar-fixed-top">
+    <div class="container">
+        <div class="navbar-header">
+            <a class="navbar-brand" href="~baseurl~">Minimalus Layoutilus</a>
+        </div>
+    </div>
+</nav>
+<div class="container">
+    ~heading~
+    <div class="alert alert-danger">
+        %s
+        <p><strong>Last Error:</strong><br />%s</p>
+    </div>
+</div>
+<div id="placeholder">Error</div>
+<script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
 </body>
 </html>
 EOF;
