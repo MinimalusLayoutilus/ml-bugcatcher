@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php: ['5.6', '7.0', '7.1']
+    name: PHP ${{ matrix.php }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: ml-bugcatcher
+
+      - uses: actions/checkout@v4
+        with:
+          repository: carschrotter/ml-core
+          path: ml-core
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+
+      - name: Add path repository for ml-core
+        working-directory: ml-bugcatcher
+        run: composer config repositories.ml-core '{"type":"path","url":"../ml-core"}'
+
+      - name: Install dependencies
+        working-directory: ml-bugcatcher
+        run: composer install --no-progress --prefer-dist
+
+      - name: Run tests
+        working-directory: ml-bugcatcher
+        run: vendor/bin/phpunit

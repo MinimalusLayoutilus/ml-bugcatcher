@@ -1,15 +1,22 @@
 {
     "name": "mnhcc/ml-bugcatcher",
-    "version": "0.9.0",
     "description": "Minimalus Layoutilus — error handler, event system and exception classes",
     "type": "library",
     "license": "LGPL-2.1-only",
+    "keywords": ["error-handler", "event", "exceptions", "debug", "framework"],
+    "homepage": "https://github.com/carschrotter/ml-bugcatcher",
     "authors": [
         {
             "name": "Michael Hegenbarth (carschrotter)",
-            "email": "mnh@mn-hegenbarth.de"
+            "email": "mnh@mn-hegenbarth.de",
+            "homepage": "https://github.com/carschrotter",
+            "role": "Developer"
         }
     ],
+    "support": {
+        "issues": "https://github.com/carschrotter/ml-bugcatcher/issues",
+        "source": "https://github.com/carschrotter/ml-bugcatcher"
+    },
     "require": {
         "php": ">=5.4",
         "mnhcc/ml-core": "^0.9",
@@ -26,11 +33,9 @@
     "require-dev": {
         "phpunit/phpunit": "^5.7"
     },
-    "repositories": [
-        {"type": "path", "url": "../ml-core"}
-    ],
     "scripts": {
         "test": "vendor/bin/phpunit"
     },
-    "minimum-stability": "dev"
+    "minimum-stability": "stable",
+    "prefer-stable": true
 }
