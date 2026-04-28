@@ -37,7 +37,12 @@ namespace mnhcc\ml\classes {
 	const ERROR = E_ERROR;
 	const WARNING = E_WARNING;
 	const NOTICE = E_NOTICE;
-	const STRICT = E_STRICT;
+	// E_STRICT is deprecated since PHP 8.4 and removed in 9.0; use the
+	// constant's last numeric value (2048) so the framework's own
+	// `Error::STRICT` remains valid across the entire 5.6 → 9.x window.
+	// Existing user code that compares against `Error::STRICT` keeps
+	// working; we simply stop poking at the deprecated runtime constant.
+	const STRICT = 2048;
 	const DEPRECATED = E_DEPRECATED;
 	const EXCEPTION = -1;
 	const RAISE_USE_TEMPLATE = '{"RAISEUSETEMPLATE":true,"secure":"Ay0keRT1l8"}';
@@ -413,7 +418,7 @@ EOF;
 		case E_USER_DEPRECATED:
 		    $type = self::DEPRECATED;
 		    break;
-		case E_STRICT :
+		case 2048: // E_STRICT (deprecated since PHP 8.4, removed in 9.0)
 		    $type = self::STRICT;
 		    break;
 		case self::EXCEPTION:
@@ -439,6 +444,13 @@ EOF;
 	 */
 	function getLastException() {
 	    $test = function($exeption, $error) {
+		// PHP 7.4+ warns on `null['message']` access; the closure
+		// is invoked unconditionally below, but `$error` may be null
+		// (no fatal error landed in `error_get_last()` since the
+		// last reset).  Treat "no error to compare against" as
+		// "this exception isn't the recent fatal" and let the
+		// caller fall through to its own selection logic.
+		if (!is_array($error)) { return false; }
 		return (
 			($exeption->getMessage() == $error['message']) &&
 			($exeption->getFile() == $error['file']) &&
@@ -466,10 +478,18 @@ EOF;
 	}
 
 	/**
-	 * 
-	 * @param \Exception $e
+	 * Write a Throwable (PHP 7+) / Exception (PHP 5.6) to the framework
+	 * log.  Type hint dropped so a PHP 8 runtime fatal (TypeError,
+	 * ArgumentCountError, …) — which descends from \Error → \Throwable
+	 * but NOT \Exception — survives the trip from `handleException()`
+	 * without a "must be of type Exception, … given" TypeError.  The
+	 * body only uses methods on the \Throwable interface, so it works
+	 * uniformly across runtimes.
+	 *
+	 * @param  \Throwable|\Exception $e
+	 * @return void
 	 */
-	protected function log(\Exception $e) {
+	protected function log($e) {
 	    if (Helper::classExists('Config', true, false)) {
 		Config::getInstance()->get('errror.log', false);
 	    } else {
@@ -524,10 +544,14 @@ EOF;
 	 * {@see handleException()} so the shutdown handler can route them as
 	 * 5xx responses.
 	 *
-	 * @param  \Exception $exception
+	 * @param  \Throwable|\Exception $exception  Type hint dropped for
+	 *                                            PHP 8 compat — \Error
+	 *                                            descendants don't extend
+	 *                                            \Exception but DO need
+	 *                                            to flow through here.
 	 * @return void
 	 */
-	public function report(\Exception $exception) {
+	public function report($exception) {
 	    $this->log($exception);
 	    if (defined('DEBUG') && DEBUG) {
 		$this->_softExceptions[] = $exception;
@@ -850,7 +874,7 @@ EOF;
 		    return 'E_USER_WARNING';
 		case E_USER_NOTICE: // 1024 //
 		    return 'E_USER_NOTICE';
-		case E_STRICT: // 2048 //
+		case 2048: // E_STRICT (deprecated since PHP 8.4, removed in 9.0)
 		    return 'E_STRICT';
 		case E_RECOVERABLE_ERROR: // 4096 //
 		    return 'E_RECOVERABLE_ERROR';

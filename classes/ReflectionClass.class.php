@@ -77,6 +77,7 @@ namespace mnhcc\ml\classes {
 	 * @param string $class
 	 * @return ReflectionMethod|null
 	 */
+	#[\ReturnTypeWillChange]
 	public function getMethod($name, $class = null) {
 	    if ($class !== null) {
 		if (Helper::classExists($class, false, true) && is_subclass_of($class, 'ReflectionMethod')) {
@@ -88,6 +89,7 @@ namespace mnhcc\ml\classes {
 	    return null;
 	}
 
+	#[\ReturnTypeWillChange]
 	public function getConstants($only_framework_const = false, $prefix_filter = false) {
 	    $constants = parent::getConstants();
 	    if ($only_framework_const) {

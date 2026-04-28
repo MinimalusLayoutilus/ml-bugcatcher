@@ -7,6 +7,76 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.9.2] — 2026-04-28
+
+### Fixed — PHP 8.x compatibility (verified live on PHP 8.5)
+- **`ReflectionStaticMethod::invoke` / `invokeArgs` and
+  `ReflectionObjectMethod::invoke` LSP-violation under PHP 8.0+.**
+  Parent `\ReflectionMethod::invoke()` is `(?object $object, mixed ...$args): mixed`
+  on PHP 8 — the framework's old `($parameter = null, $_ = null)`
+  fixed-2-arg shape failed PHP 8.5's strict signature check with
+  "Declaration of …::invoke() must be compatible with
+  ReflectionMethod::invoke(?object, mixed ...): mixed".
+  Signatures rewritten to variadic `(\$object = null, ...\$args)`
+  (PHP 5.6+ syntax) and stamped with `#[\ReturnTypeWillChange]` so
+  the missing `: mixed` return type stops triggering deprecations
+  on PHP 8.1+.  Body keeps the framework's historical "all caller
+  arguments are method args" semantics — RSM/ROM are bound to a
+  class / object via the constructor, so the parent's `$object`
+  slot has no semantic role here.  All in-tree callers
+  (`Filter::__callStatic`, `Control::actionDefault` /
+  `actionDispatch`, `Programm::runn`, `BootstrapHandler::Load`,
+  `traits\Prototype::__call`/`__callStatic`) keep working
+  unchanged.
+- **`ReflectionClass::getMethod` and `getConstants`
+  return-type-mismatch deprecation under PHP 8.1+.**  Both override
+  internal Reflection methods that PHP 8 declares with `: ?ReflectionMethod`
+  / `: array`.  Stamped with `#[\ReturnTypeWillChange]`.
+- **`Error::STRICT` no longer references `E_STRICT`.**  The constant is
+  deprecated since PHP 8.4 and removed in PHP 9.0; touching it from a
+  class-constant initialiser fired `E_DEPRECATED` on every load.
+  Replaced with the literal value `2048` (PHP's last numeric value
+  for the constant), and the two `case E_STRICT:` branches in the
+  error-class handler updated to `case 2048:` so the framework's
+  `Error::STRICT` semantics survive into PHP 9+ untouched.
+- **`Error::log()` and `Error::report()` accept any `Throwable`,
+  not just `\Exception`.**  The PHP 8 runtime throws `\Error`
+  descendants (TypeError, ArgumentCountError, ValueError, …) from
+  the engine; they are NOT subclasses of `\Exception` but ARE of
+  `\Throwable` (PHP 7+).  The historical `(\Exception $e)` type
+  hint fataled with "Argument #1 (\$e) must be of type Exception,
+  TypeError given" the moment the shutdown handler tried to log a
+  PHP 8 runtime fatal.  Type hints removed; bodies only call
+  methods on the `\Throwable` interface so behaviour stays
+  identical on PHP 5.6.
+- **`Error::getLastException()` no longer warns on PHP 7.4+.**  The
+  internal `$test` closure compared an Exception against
+  `error_get_last()`'s return value; on a request with no fatal
+  error the latter is `null`, and PHP 7.4+ emits
+  "Trying to access array offset on null" on `$error['message']`.
+  Closure now early-returns `false` when `$error` is not an array,
+  matching the original "no recent fatal to compare against"
+  semantics.
+- **`Exception\InvalidArgumentException` raised on PHP 8 fatals
+  inside `ExceptionEventParms`.**  The constructor's
+  `$parms['exception'] instanceof \Exception` guard rejected
+  `\Error` descendants.  Now accepts any `Throwable` (PHP 7+) and
+  falls back to the `\Exception` check on PHP 5.6 where `\Throwable`
+  doesn't exist.
+
+### Compatibility
+- Framework's PHP floor stays at 5.6.  All fixes use 5.6-syntactic
+  constructs (variadic `...$args` available since 5.6, `#[…]`
+  attribute-syntax parses as a `#`-comment on 5.6/7.x and as a real
+  attribute on 8.0+).  No new runtime deps.
+- Skeleton (`MinimalusLayoutilus`) and `mn-hegenbarth.de`
+  smoke-tested on PHP 5.6 (no behaviour change) and on PHP 8.5
+  (page renders byte-identical except the dynamic time-of-day
+  greeting and an unrelated counter-service idiosyncrasy).
+- `ml-bugcatcher` Suite (13 tests, 42 assertions) green on PHP 5.6
+  in DDEV; PHP 8.5 smoke covered by `mn-hegenbarth.de`'s live
+  bootstrap.
+
 ## [0.9.1] — 2026-04-28
 
 ### Added

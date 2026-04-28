@@ -61,16 +61,24 @@ use \mnhcc\ml\traits as traits;
         }
 
         /**
-         * Invoke a method whit the given array as arguments on the object
-	 * @param mixed $parameter [optional] <p>
-	 * Zero or more parameters to be passed to the method.
-	 * It accepts a variable number of parameters which are passed to the method.
-	 * </p>
-	 * @param mixed $_ [optional]
-	 * @return mixed the method result.
+         * Invokes the bound method on `$this->object` with the given
+         * args.  Signature is variadic to match parent's PHP-8
+         * (`?object $object, mixed ...$args`), but the framework's
+         * historical API treats every argument as a method arg —
+         * ROM is already bound to `$this->object`, so the parent's
+         * `$object` slot has no semantic role here.  Whatever the
+         * caller passes as the first argument is shifted into the
+         * args list.
+         *
+         * @return mixed the method result.
          */
-        public function invoke($parameter = null, $_ = null) {
-            return self::invokeArgs($this->object, func_get_args());
+        #[\ReturnTypeWillChange]
+        public function invoke($object = null, ...$args) {
+            $callArgs = $args;
+            if (\func_num_args() > 0) {
+                \array_unshift($callArgs, $object);
+            }
+            return parent::invokeArgs($this->object, $callArgs);
         }
 
         /**

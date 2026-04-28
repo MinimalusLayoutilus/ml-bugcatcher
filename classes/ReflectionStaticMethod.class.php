@@ -33,34 +33,52 @@ use \mnhcc\ml\traits as traits; {
         }
 
 	/**
-	 * invokes a static method on the class of the object
-	 * @param array $args
+	 * Invokes the bound static method with the given args array.  Two
+	 * call shapes are accepted to bridge the parent's PHP-8 signature
+	 * (`?object $object, array $args`) and the framework's legacy
+	 * one-arg form:
+	 *   - new / parent-compatible:  $rsm->invokeArgs(null, [arg1, arg2])
+	 *   - legacy framework form:    $rsm->invokeArgs([arg1, arg2])
+	 * The first parameter is ignored when it is not null/object — for
+	 * static methods the bound class is already known via the
+	 * `($class, $name)` constructor and parent::invokeArgs(null, ...)
+	 * is what PHP wants on every supported runtime.
+	 *
 	 * @return mixed the result of method
 	 */
-        public function invokeArgs($args = [], array $placeholder =[]) {
-	    if(!ArrayHelper::isArray($args)){ throw new Exception('$args is not array');}
-	    return parent::invokeArgs(null, $args);
+        #[\ReturnTypeWillChange]
+        public function invokeArgs($objectOrArgs = null, array $args = []) {
+            if (is_array($objectOrArgs)) {
+                // Legacy single-array form: caller passed args as first param.
+                $args = $objectOrArgs;
+            }
+            return parent::invokeArgs(null, $args);
         }
 	
+	#[\ReturnTypeWillChange]
 	public function getClosureScopeClass() {
 	    parent::getClosureScopeClass();
 	}
 
         /**
-         * Invokes a method on the class
-	 * @param mixed $parameter [optional] <p>
-	 * Zero or more parameters to be passed to the method.
-	 * It accepts a variable number of parameters which are passed to the method.
-	 * </p>
-	 * @param mixed $_ [optional]
-	 * @return mixed the method result.
+         * Invokes the bound static method with the given args.
+         * Signature is variadic to match parent's PHP-8
+         * (`?object $object, mixed ...$args`), but the framework's
+         * historical API treats every argument as a method arg —
+         * the class is already bound via the `($class, $name)` ctor,
+         * so the parent's `$object` slot is meaningless for static
+         * methods.  Whatever the caller passes as the first argument
+         * is shifted into the args list.
+         *
+         * @return mixed the method result.
          */
-        public function invoke($parameter = null, $_ = null) {
-            if (func_num_args() > 0) {
-                return self::invokeArgs(func_get_args());
-            } else {
-                return parent::invoke(null);
+        #[\ReturnTypeWillChange]
+        public function invoke($object = null, ...$args) {
+            $callArgs = $args;
+            if (\func_num_args() > 0) {
+                \array_unshift($callArgs, $object);
             }
+            return parent::invokeArgs(null, $callArgs);
         }
 	public static function ___onLoaded() {
 	    return null;
