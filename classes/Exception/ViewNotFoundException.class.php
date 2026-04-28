@@ -1,23 +1,25 @@
 <?php
 
-namespace mnhcc\ml\classes\exception {
-
-    use \mnhcc\ml,
-    \mnhcc\ml\classes,
-    \mnhcc\ml\classes\Exception;
+namespace mnhcc\ml\classes\Exception {
 
     /**
-     * Description of ViewNotFoundException
+     * Thrown when the View class for a given controller cannot be found.
      *
      * @author Michael Hegenbarth (carschrotter)
-     * @package MinimalusLayoutilus	 
+     * @package MinimalusLayoutilus
      */
-    class ViewNotFoundException extends RenderException {
+    class ViewNotFoundException extends NotFoundException {
+
+	/** @var string */
+	protected $_className;
 
 	public function __construct($class, \ReflectionException $previous) {
-	    $message = 'View: ' . $class . ' not Found';
-	    Exception::__construct($message, $previous->getCode(), $previous);
 	    $this->_className = $class;
+	    parent::__construct('View: ' . $class . ' not Found', 404, $previous);
+	}
+
+	public function getClassName() {
+	    return $this->_className;
 	}
 
     }

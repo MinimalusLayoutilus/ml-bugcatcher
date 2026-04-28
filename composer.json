@@ -1,9 +1,9 @@
 {
     "name": "mnhcc/ml-bugcatcher",
-    "description": "Minimalus Layoutilus — error handler, event system and exception classes",
+    "description": "Minimalus Layoutilus — error/exception handler with debug overlay and typed exception hierarchy",
     "type": "library",
     "license": "LGPL-2.1-only",
-    "keywords": ["error-handler", "event", "exceptions", "debug", "framework"],
+    "keywords": ["error-handler", "exceptions", "debug", "framework"],
     "homepage": "https://github.com/carschrotter/ml-bugcatcher",
     "authors": [
         {
@@ -41,6 +41,9 @@
     "extra": {
         "branch-alias": {
             "dev-main": "0.9.x-dev"
+        },
+        "mnhcc-ml": {
+            "register": true
         }
     }
 }

@@ -1,6 +1,6 @@
 <?php
 
-namespace mnhcc\ml\classes\exception {
+namespace mnhcc\ml\classes\Exception {
 
     use \mnhcc\ml\interfaces,
 	\mnhcc\ml\traits;

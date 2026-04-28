@@ -1,6 +1,6 @@
 <?php
 
-namespace mnhcc\ml\classes\exception {
+namespace mnhcc\ml\classes\Exception {
 
     /**
      * Description of ModulRendererNotFoundException

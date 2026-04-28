@@ -100,6 +100,17 @@ EOF;
 	private $_exceptions = array();
 
 	/**
+	 * Soft / reported exceptions — non-fatal failures handed to the
+	 * framework via `report()`.  Always written to the framework log;
+	 * additionally rendered into the BugCatcher overlay when DEBUG is on
+	 * so a developer notices a partial failure during a render that
+	 * otherwise looks fine in production.
+	 *
+	 * @var \Exception[]
+	 */
+	protected $_softExceptions = array();
+
+	/**
 	 * Value is true when is json vormat
 	 * @var type
 	 */
@@ -121,7 +132,25 @@ EOF;
 	    return $this->_isDisplayedBugs;
 	}
 
-	protected static function renderTemplate() {
+	/**
+	 * Render the BugCatcher default-fallback HTML page.
+	 *
+	 * The inner template (self::$template) holds two `%s` sprintf slots for
+	 * the main message and the "Last Error" detail plus `~baseurl~` and
+	 * `~heading~` placeholders that are str_replaced from
+	 * self::$_templateParms.  The result is a self-contained HTML document
+	 * with Bootstrap CSS/JS from cdn — no Programm, no Template, no
+	 * PageConfig dependency, so it survives any framework state.
+	 *
+	 * Public so that TemplateHtml::_renderInlineFallback can reuse it as
+	 * a recursion-safety net when the user's own template throws during
+	 * render (otherwise we'd duplicate the markup).
+	 *
+	 * @param  string $message    HTML to embed in the alert body.  Optional.
+	 * @param  string $lastError  Plain-text "Last Error" line.  Optional.
+	 * @return string             A complete HTML document.
+	 */
+	public static function renderTemplate() {
 	    $args = func_get_args();
 	    $template = self::$template;
 
@@ -231,13 +260,9 @@ EOF;
 	public function documentPrepareHTML($doc) {
 	    $html = '';
 	    if (!$this->isDisplayedBugs()) {
-		$html = $this->displayBugs();
-		$html .= "<script  type=\"text/javascript\">
-                    function toggleContainer(name) {
-                    var e = document.getElementById(name);// old scool. jqery might not be available ;)
-                    e.style.height = (e.style.height == '0px') ? 'auto' : '0px';
-                    }
-                    </script>";
+		$html  = $this->displayBugs();
+		$html .= self::_overlayScript();
+		$html .= self::_overlayStyles();
 	    }
 	    $msg = '';
 	    if(strpos($doc, '</body>') === false) {
@@ -486,6 +511,39 @@ EOF;
 	}
 
 	/**
+	 * Report a non-fatal exception.
+	 *
+	 * Always written to the framework log via {@see log()}.  When DEBUG is
+	 * defined and truthy, additionally collected for the BugCatcher overlay
+	 * — so a developer running with DEBUG=1 sees a partial filter / module /
+	 * pipeline failure that would otherwise pass silently in production.
+	 *
+	 * Use this for recoverable failures where the surrounding render must
+	 * keep going (one filter blew up, the rest of the pipeline still runs)
+	 * — never for genuinely uncaught exceptions, which belong on
+	 * {@see handleException()} so the shutdown handler can route them as
+	 * 5xx responses.
+	 *
+	 * @param  \Exception $exception
+	 * @return void
+	 */
+	public function report(\Exception $exception) {
+	    $this->log($exception);
+	    if (defined('DEBUG') && DEBUG) {
+		$this->_softExceptions[] = $exception;
+	    }
+	}
+
+	/**
+	 * Read-only access to the soft / reported exceptions registry.
+	 *
+	 * @return \Exception[]
+	 */
+	public function getSoftExceptions() {
+	    return $this->_softExceptions;
+	}
+
+	/**
 	 * @param int $errno
 	 * @param string $errstr
 	 * @param string $errfile
@@ -525,7 +583,11 @@ EOF;
 	    $this->_isDisplayedBugs = true;
 	    $count = count($this->_exceptions);
 	    $js = "toggleContainer('dbg-content-bugcatcher-$count');";
-	    $html = '<div class="container" >'
+	    // Wrap in our own container instead of Bootstrap's `.container` so
+	    // the overlay always renders full-width with our own background and
+	    // text colours regardless of the host page's CSS.  See
+	    // _overlayStyles() for the actual rules.
+	    $html = '<div class="bugcatcher-overlay">'
 		     . ' <div class="row">' . n
 		    . '     <div class="span12">' . n
 		    . '		<div class="accordion" id="mnhcc-bugcatcher-debug">' . n
@@ -558,15 +620,48 @@ EOF;
 		}
 	    }
 	    $html = str_replace(array_keys($this->_errorHash), $this->_errorHash, $html);
-	    
+
+	    // Soft (reported) exceptions — rendered as a sibling block so the
+	    // primary chain stays uncluttered.  Hidden when none have been
+	    // reported, so production renders without DEBUG see nothing.
+	    $html .= $this->_renderSoftExceptions();
+
 	    $memoryUsage = new Bytes(memory_get_usage());
 	    $memoryLimit = new Bytes(ini_get('memory_limit'));
 	    $runtime = 'not enabeled';
 	    if(Bootstrap::defined('STARTTIME')){
 		$runtime = microtime(true) - Bootstrap::constant('STARTTIME');
-	    } 
+	    }
 	    $html .= '<div><code>Runtime: ' . $runtime . ' ' . $memoryUsage->getUfriendlySize() . ' from max ' . $memoryLimit->getUfriendlySize() . '</code>';
 	    $html .= '</div></div></div></div></div></div>';
+	    return $html;
+	}
+
+	/**
+	 * Render the soft / reported exceptions panel (DEBUG-only block at the
+	 * bottom of the overlay).  Each reported exception gets its own header
+	 * + collapsible backtrace, styled with the .reported modifier so it is
+	 * visually distinct from the primary exception chain.
+	 *
+	 * @return string  Empty string when no soft exceptions have been
+	 *                 collected — keeps the overlay tidy in the no-fault
+	 *                 case.
+	 */
+	protected function _renderSoftExceptions() {
+	    if (empty($this->_softExceptions)) {
+		return '';
+	    }
+	    static $softId;
+	    if ($softId === null) { $softId = 1; }
+
+	    $count = count($this->_softExceptions);
+	    $html  = '<div class="dbgHeader reported">'
+		   . 'Reported (non-fatal) [' . $count . ']'
+		   . '</div>';
+	    foreach ($this->_softExceptions as $exception) {
+		$id = 'dbg-soft-' . $softId++;
+		$html .= $this->_renderExceptionFrame($exception, 'Reported:', $id, false);
+	    }
 	    return $html;
 	}
 	
@@ -580,39 +675,79 @@ EOF;
 	}
 	
 	/**
-	 * @staticvar string $html
+	 * Render a single exception plus its full getPrevious() chain into the
+	 * BugCatcher debug overlay.
+	 *
+	 * The primary exception gets the original-style header.  Each chained
+	 * predecessor gets a "Caused by:" prefix and its own collapsible
+	 * dbgContainer with its own backtrace.  Per-frame toggle IDs are unique
+	 * across calls so multiple stacked exceptions never share a container.
+	 *
 	 * @staticvar int $id
-	 * @param Exception $exception
+	 * @param  \Exception $exception  The primary exception (caller passes a
+	 *                                duplicate-check hash in $has).
+	 * @param  string     $has        Hash for the primary, used in the header tag.
 	 * @return string
 	 */
 	protected function renderError($exception, $has) {
 	    static $id;
-	    if ($id === null){$id = 1;}
-	    $html = '';
-	    $js = "toggleContainer('dbgContainer_BugCatcher" . $id . "');";
-	    $style = ' style="height: 0px;"';
-	    $errorType = (is_a($exception, 'ErrorException')) ? self::FriendlyErrorType($exception->getCode()) : get_class($exception);
-	    $html .= '          <div class="dbgHeader" onclick="' . $js . '">' . n
-		    . '           <a href="javascript:void(0);">' . n
-		    . '               <h3 title="' . self::FriendlyErrorType($exception->getCode()) . ' in ' . $exception->getFile() . '">       ' . n
-		    . '['.$has.'] '
-		    . $exception->getMessage() . n
-		    . '               </h3>' . n
-		    . '           </a>' . n
-		    . '          </div>' . n;
+	    if ($id === null) { $id = 1; }
+
+	    $html    = '';
+	    $current = $exception;
+	    $depth   = 0;
+	    while ($current !== null) {
+		// Reuse the primary $has so the dedup label stays stable in the
+		// header; previous-frames get a derived label for visual context.
+		$frameLabel = ($depth === 0) ? $has : ($has . '.' . $depth);
+		$html .= $this->_renderExceptionFrame($current, $frameLabel, $id, $depth === 0);
+		$id++;
+		$current = $current->getPrevious();
+		$depth++;
+	    }
+
+	    return str_replace(ROOT_PATH, 'ROOT_PATH', $html);
+	}
+
+	/**
+	 * Build the HTML for one exception frame in the BugCatcher overlay.
+	 *
+	 * @param  \Exception $exception
+	 * @param  string     $label     Header label (hash for primary, derived for chain).
+	 * @param  int        $id        Unique toggle id for this frame.
+	 * @param  bool       $isPrimary False for previous-chain frames.
+	 * @return string
+	 */
+	protected function _renderExceptionFrame($exception, $label, $id, $isPrimary) {
+	    $js        = "toggleContainer('dbgContainer_BugCatcher" . $id . "');";
+	    $style     = ' style="height: 0px;"';
+	    $errorType = (is_a($exception, 'ErrorException'))
+		? self::FriendlyErrorType($exception->getCode())
+		: get_class($exception);
+	    $headerCss = 'dbgHeader' . ($isPrimary ? '' : ' caused-by');
+	    $causedBy  = $isPrimary ? '' : 'Caused by: ';
+
+	    $html  = '          <div class="' . $headerCss . '" onclick="' . $js . '">' . n
+		   . '           <a href="javascript:void(0);">' . n
+		   . '               <h3 title="' . self::FriendlyErrorType($exception->getCode())
+		   . ' in ' . $exception->getFile() . '">       ' . n
+		   . '['.$label.'] ' . $causedBy
+		   . $exception->getMessage() . n
+		   . '               </h3>' . n
+		   . '           </a>' . n
+		   . '          </div>' . n;
 	    $html .= '          <div ' . $style . ' class="dbgContainer" id="dbgContainer_BugCatcher' . $id . '">' . n
-		    . '           <p class="' . Helper::cssNameClean($errorType) . ' alert alert-info">' . n
-		    . '               <b>[' . $errorType . '] </b>'
-		    . $exception->getMessage() . ': in file '
-		    . $exception->getFile()
-		    . ' on line '
-		    . $exception->getLine()
-		    . '               <br /><br /><br />' . n
-		    . '            </p>' . n;
+		   . '           <p class="' . Helper::cssNameClean($errorType) . ' alert alert-info">' . n
+		   . '               <b>[' . $errorType . '] </b>'
+		   . $exception->getMessage() . ': in file '
+		   . $exception->getFile()
+		   . ' on line '
+		   . $exception->getLine()
+		   . '               <br /><br /><br />' . n
+		   . '            </p>' . n;
 	    $html .= static::renderBacktrace($exception->getTrace());
 	    $html .= '          </div>' . n;
-	    $id++;
-	    return str_replace(ROOT_PATH, 'ROOT_PATH', $html);
+	    return $html;
 	}
 
 	public static function renderBacktrace(array $trace) {
@@ -739,6 +874,247 @@ EOF;
 	    }
 	}
 	
+	/**
+	 * Inline JS for the BugCatcher overlay — toggles a single dbgContainer
+	 * between collapsed (height: 0) and expanded (height: auto).  Vanilla,
+	 * jQuery-free, IE11-compatible.
+	 *
+	 * @return string  An HTML <script> block.
+	 */
+	protected static function _overlayScript() {
+	    return n . '<script type="text/javascript">' . n
+		 . 'function toggleContainer(name) {' . n
+		 . '    var e = document.getElementById(name);' . n
+		 . '    if (!e) { return; }' . n
+		 . '    if (e.style.height === \'0px\') {' . n
+		 . '        e.style.height = \'auto\';' . n
+		 . '        e.style.display = \'block\';' . n
+		 . '    } else {' . n
+		 . '        e.style.height = \'0px\';' . n
+		 . '        e.style.display = \'\';' . n
+		 . '    }' . n
+		 . '}' . n
+		 . '</script>' . n;
+	}
+
+	/**
+	 * The BugCatcher overlay's stylesheet.
+	 *
+	 * Goals
+	 * -----
+	 * - Always full-width, regardless of the host page's container CSS.
+	 * - Light, high-contrast defaults (white background, dark grey text)
+	 *   so it is legible on any host theme — including dark-blue layouts
+	 *   like mn-hegenbarth.de's blue template.
+	 * - IE11 compatibility: no CSS custom properties, no `:has()`,
+	 *   no `@supports`, no logical properties.  Plain RGB values, named
+	 *   selectors, classic media queries.
+	 * - `prefers-color-scheme: dark` is honored on browsers that support
+	 *   it; IE11 and older Safari ignore the @media block and stay on the
+	 *   light defaults.
+	 *
+	 * @return string  An HTML <style> block.
+	 */
+	protected static function _overlayStyles() {
+	    return n . '<style type="text/css">' . n
+. '.bugcatcher-overlay {' . n
+. '    width: 100%;' . n
+. '    box-sizing: border-box;' . n
+. '    margin: 2em 0 0 0;' . n
+. '    padding: 1.25em 2em;' . n
+. '    background: #ffffff;' . n
+. '    color: #222222;' . n
+. '    font-family: "Segoe UI", Tahoma, Geneva, Verdana, Arial, sans-serif;' . n
+. '    font-size: 14px;' . n
+. '    line-height: 1.5;' . n
+. '    border-top: 4px solid #c00000;' . n
+. '    text-align: left;' . n
+. '    position: relative;' . n
+. '    z-index: 9999;' . n
+. '}' . n
+. '.bugcatcher-overlay * { box-sizing: border-box; }' . n
+. '.bugcatcher-overlay h1,' . n
+. '.bugcatcher-overlay h2,' . n
+. '.bugcatcher-overlay h3,' . n
+. '.bugcatcher-overlay h4,' . n
+. '.bugcatcher-overlay h5,' . n
+. '.bugcatcher-overlay h6 {' . n
+. '    color: #1a1a1a;' . n
+. '    font-weight: 600;' . n
+. '    margin: 0 0 0.5em 0;' . n
+. '}' . n
+. '.bugcatcher-overlay a,' . n
+. '.bugcatcher-overlay a:link,' . n
+. '.bugcatcher-overlay a:visited {' . n
+. '    color: #0050a0;' . n
+. '    text-decoration: none;' . n
+. '}' . n
+. '.bugcatcher-overlay a:hover { text-decoration: underline; }' . n
+. '.bugcatcher-overlay p { margin: 0.5em 0; }' . n
+. '.bugcatcher-overlay code,' . n
+. '.bugcatcher-overlay pre {' . n
+. '    font-family: Consolas, "Liberation Mono", Menlo, "Courier New", monospace;' . n
+. '    background: #f4f4f4;' . n
+. '    color: #c00000;' . n
+. '    padding: 1px 4px;' . n
+. '    border-radius: 3px;' . n
+. '    word-break: break-all;' . n
+. '}' . n
+. '.bugcatcher-overlay pre {' . n
+. '    display: block;' . n
+. '    padding: 0.75em 1em;' . n
+. '    overflow-x: auto;' . n
+. '    color: #222222;' . n
+. '}' . n
+. '.bugcatcher-overlay .dbg-header {' . n
+. '    background: #f0f0f0;' . n
+. '    border: 1px solid #d0d0d0;' . n
+. '    border-left: 4px solid #c00000;' . n
+. '    padding: 0.5em 1em;' . n
+. '    cursor: pointer;' . n
+. '    font-weight: 600;' . n
+. '}' . n
+. '.bugcatcher-overlay .dbgHeader {' . n
+. '    background: #f7f7f7;' . n
+. '    border: 1px solid #d8d8d8;' . n
+. '    border-left: 4px solid #c00000;' . n
+. '    padding: 0.5em 1em;' . n
+. '    margin-top: 0.5em;' . n
+. '    cursor: pointer;' . n
+. '}' . n
+. '.bugcatcher-overlay .dbgHeader.caused-by {' . n
+. '    border-left-color: #c08040;' . n
+. '    margin-left: 1.5em;' . n
+. '}' . n
+. '.bugcatcher-overlay .dbgHeader.reported {' . n
+. '    border-left-color: #4070c8;' . n
+. '    background: #f0f4fa;' . n
+. '    margin-top: 1em;' . n
+. '}' . n
+. '.bugcatcher-overlay .dbgHeader h3 {' . n
+. '    margin: 0;' . n
+. '    font-size: 1em;' . n
+. '    color: #1a1a1a;' . n
+. '    font-weight: 600;' . n
+. '}' . n
+. '.bugcatcher-overlay .dbgContainer {' . n
+. '    background: #fafafa;' . n
+. '    border: 1px solid #d8d8d8;' . n
+. '    border-top: 0;' . n
+. '    padding: 1em;' . n
+. '    overflow: hidden;' . n
+. '}' . n
+. '.bugcatcher-overlay .alert {' . n
+. '    padding: 0.75em 1em;' . n
+. '    border: 1px solid #d8d8d8;' . n
+. '    border-radius: 3px;' . n
+. '    margin: 0.5em 0;' . n
+. '}' . n
+. '.bugcatcher-overlay .alert.alert-info {' . n
+. '    background: #fff8d6;' . n
+. '    color: #66501a;' . n
+. '    border-color: #f0e0a0;' . n
+. '}' . n
+. '.bugcatcher-overlay .alert.alert-error,' . n
+. '.bugcatcher-overlay .alert.alert-danger {' . n
+. '    background: #fdecec;' . n
+. '    color: #882020;' . n
+. '    border-color: #f4c0c0;' . n
+. '}' . n
+. '.bugcatcher-overlay .backtrace-table {' . n
+. '    width: 100%;' . n
+. '    border-collapse: collapse;' . n
+. '    background: #ffffff;' . n
+. '    margin-top: 0.75em;' . n
+. '    table-layout: fixed;' . n
+. '}' . n
+. '.bugcatcher-overlay .backtrace-table .TD {' . n
+. '    border: 1px solid #d8d8d8;' . n
+. '    padding: 0.4em 0.75em;' . n
+. '    vertical-align: top;' . n
+. '    text-align: left;' . n
+. '    word-break: break-word;' . n
+. '    color: #222222;' . n
+. '    font-size: 13px;' . n
+. '}' . n
+. '.bugcatcher-overlay .backtrace-table thead .TD {' . n
+. '    background: #ececec;' . n
+. '    color: #1a1a1a;' . n
+. '    font-weight: 600;' . n
+. '}' . n
+. '.bugcatcher-overlay .accordion-toggle {' . n
+. '    color: #1a1a1a;' . n
+. '    font-weight: 600;' . n
+. '    font-size: 1.05em;' . n
+. '}' . n
+. '.bugcatcher-overlay code, .bugcatcher-overlay pre,' . n
+. '.bugcatcher-overlay .alert, .bugcatcher-overlay .alert b {' . n
+. '    line-height: 1.5;' . n
+. '}' . n
+/* ------------------ Dark mode (modern browsers only) ------------------ */
+. '@media (prefers-color-scheme: dark) {' . n
+. '    .bugcatcher-overlay {' . n
+. '        background: #1e1e1e;' . n
+. '        color: #d8d8d8;' . n
+. '        border-top-color: #ff6b6b;' . n
+. '    }' . n
+. '    .bugcatcher-overlay h1,' . n
+. '    .bugcatcher-overlay h2,' . n
+. '    .bugcatcher-overlay h3,' . n
+. '    .bugcatcher-overlay h4,' . n
+. '    .bugcatcher-overlay h5,' . n
+. '    .bugcatcher-overlay h6,' . n
+. '    .bugcatcher-overlay .accordion-toggle,' . n
+. '    .bugcatcher-overlay .dbgHeader h3 { color: #f0f0f0; }' . n
+. '    .bugcatcher-overlay a,' . n
+. '    .bugcatcher-overlay a:link,' . n
+. '    .bugcatcher-overlay a:visited { color: #6ec3ff; }' . n
+. '    .bugcatcher-overlay .dbg-header,' . n
+. '    .bugcatcher-overlay .dbgHeader {' . n
+. '        background: #2a2a2a;' . n
+. '        border-color: #3a3a3a;' . n
+. '        border-left-color: #ff6b6b;' . n
+. '    }' . n
+. '    .bugcatcher-overlay .dbgHeader.caused-by {' . n
+. '        border-left-color: #d8a060;' . n
+. '    }' . n
+. '    .bugcatcher-overlay .dbgContainer {' . n
+. '        background: #232323;' . n
+. '        border-color: #3a3a3a;' . n
+. '    }' . n
+. '    .bugcatcher-overlay code,' . n
+. '    .bugcatcher-overlay pre {' . n
+. '        background: #2a2a2a;' . n
+. '        color: #ff9090;' . n
+. '    }' . n
+. '    .bugcatcher-overlay pre { color: #d8d8d8; }' . n
+. '    .bugcatcher-overlay .alert {' . n
+. '        border-color: #3a3a3a;' . n
+. '    }' . n
+. '    .bugcatcher-overlay .alert.alert-info {' . n
+. '        background: #332a14;' . n
+. '        color: #e8d090;' . n
+. '        border-color: #4a3a18;' . n
+. '    }' . n
+. '    .bugcatcher-overlay .alert.alert-error,' . n
+. '    .bugcatcher-overlay .alert.alert-danger {' . n
+. '        background: #3a1818;' . n
+. '        color: #f5a8a8;' . n
+. '        border-color: #5a2828;' . n
+. '    }' . n
+. '    .bugcatcher-overlay .backtrace-table { background: #1e1e1e; }' . n
+. '    .bugcatcher-overlay .backtrace-table .TD {' . n
+. '        border-color: #3a3a3a;' . n
+. '        color: #d8d8d8;' . n
+. '    }' . n
+. '    .bugcatcher-overlay .backtrace-table thead .TD {' . n
+. '        background: #2a2a2a;' . n
+. '        color: #f0f0f0;' . n
+. '    }' . n
+. '}' . n
+. '</style>' . n;
+	}
+
 	public static function ___require() {
 	    return parent::___require();
 	}

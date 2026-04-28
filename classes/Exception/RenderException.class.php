@@ -14,7 +14,7 @@ namespace mnhcc\ml\classes\Exception {
      * @author Michael Hegenbarth (carschrotter)
      * @package MinimalusLayoutilus	 
      */
-    class RenderException extends Exception {
+    class RenderException extends NotImplementedException {
 
 	protected $_className = false;
 	protected $_methodName = false;
@@ -26,7 +26,7 @@ namespace mnhcc\ml\classes\Exception {
 	 * @param int $code
 	 * @param \Exception $previous
 	 */
-	public function __construct($method, $class, $code = 0, $previous = null) {
+	public function __construct($method, $class, $code = 501, $previous = null) {
 	    $this->_methodName = $method;
 	    $this->_className = $class;
 	    $message = 'Call to not callable method ' . $this->getClassName() . '::' . $this->getMethodName() . '()';
