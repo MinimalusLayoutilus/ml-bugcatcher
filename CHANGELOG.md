@@ -7,6 +7,13 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [1.0.0] — 2026-05-20
+
+### Changed
+- First stable release. Promotes the 0.9.x line to 1.0; no API changes.
+- File permissions normalised to executable (`0755`) across all class, interface,
+  trait and test files.
+
 ## [0.9.2] — 2026-04-28
 
 ### Fixed — PHP 8.x compatibility (verified live on PHP 8.5)
