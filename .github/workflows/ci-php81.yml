@@ -1,0 +1,41 @@
+name: PHP 8.1
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: PHP 8.1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: ml-bugcatcher
+
+      - uses: actions/checkout@v4
+        with:
+          repository: MinimalusLayoutilus/ml-core
+          path: ml-core
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          coverage: none
+
+      - name: Add path repository for ml-core
+        working-directory: ml-bugcatcher
+        run: |
+          composer config repositories.ml-core '{"type":"path","url":"../ml-core"}'
+          composer config minimum-stability dev
+          composer config prefer-stable true
+
+      - name: Install dependencies
+        working-directory: ml-bugcatcher
+        run: composer install --no-progress --prefer-dist
+
+      - name: Run tests
+        working-directory: ml-bugcatcher
+        run: vendor/bin/phpunit

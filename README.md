@@ -1,5 +1,9 @@
 # mnhcc/ml-bugcatcher
 
+[![PHP 7.4](https://github.com/MinimalusLayoutilus/ml-bugcatcher/actions/workflows/ci-php74.yml/badge.svg)](https://github.com/MinimalusLayoutilus/ml-bugcatcher/actions/workflows/ci-php74.yml)
+[![PHP 8.1](https://github.com/MinimalusLayoutilus/ml-bugcatcher/actions/workflows/ci-php81.yml/badge.svg)](https://github.com/MinimalusLayoutilus/ml-bugcatcher/actions/workflows/ci-php81.yml)
+[![PHP 8.5](https://github.com/MinimalusLayoutilus/ml-bugcatcher/actions/workflows/ci-php85.yml/badge.svg)](https://github.com/MinimalusLayoutilus/ml-bugcatcher/actions/workflows/ci-php85.yml)
+
 Error handling and exception classes for the Minimalus Layoutilus PHP framework.
 
 Provides `Error` (error/exception handler with the BugCatcher debug overlay),
