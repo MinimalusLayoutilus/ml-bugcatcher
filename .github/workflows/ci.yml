@@ -2,16 +2,16 @@ name: CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
   pull_request:
-    branches: [ master ]
+    branches: [ main ]
 
 jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        php: ['5.6', '7.0', '7.1']
+        php: ['7.4', '8.1', '8.4']
     name: PHP ${{ matrix.php }}
     steps:
       - uses: actions/checkout@v4
@@ -20,7 +20,7 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
-          repository: carschrotter/ml-core
+          repository: MinimalusLayoutilus/ml-core
           path: ml-core
 
       - uses: shivammathur/setup-php@v2
@@ -30,7 +30,10 @@ jobs:
 
       - name: Add path repository for ml-core
         working-directory: ml-bugcatcher
-        run: composer config repositories.ml-core '{"type":"path","url":"../ml-core"}'
+        run: |
+          composer config repositories.ml-core '{"type":"path","url":"../ml-core"}'
+          composer config minimum-stability dev
+          composer config prefer-stable true
 
       - name: Install dependencies
         working-directory: ml-bugcatcher

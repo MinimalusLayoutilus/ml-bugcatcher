@@ -19,13 +19,13 @@ class ErrorRenderTest extends TestCase
 
         // One primary frame, no caused-by.
         $this->assertSame(1, substr_count($output, 'class="dbgHeader'));
-        $this->assertNotContains('caused-by', $output);
-        $this->assertNotContains('Caused by:', $output);
+        $this->assertStringNotContainsString('caused-by', $output);
+        $this->assertStringNotContainsString('Caused by:', $output);
 
         // Class name + message + label appear.
-        $this->assertContains('LogicException', $output);
-        $this->assertContains('plain failure', $output);
-        $this->assertContains('[hash-1]', $output);
+        $this->assertStringContainsString('LogicException', $output);
+        $this->assertStringContainsString('plain failure', $output);
+        $this->assertStringContainsString('[hash-1]', $output);
     }
 
     public function testRenderError_chainedExceptionEmitsCauseFrame()
@@ -44,14 +44,14 @@ class ErrorRenderTest extends TestCase
 
         // Previous frame: header carries the caused-by CSS class AND the
         // "Caused by:" label inline.
-        $this->assertContains('class="dbgHeader caused-by"', $output);
-        $this->assertContains('Caused by:', $output);
+        $this->assertStringContainsString('class="dbgHeader caused-by"', $output);
+        $this->assertStringContainsString('Caused by:', $output);
 
         // Both classes present.
-        $this->assertContains('LogicException', $output);
-        $this->assertContains('RuntimeException', $output);
-        $this->assertContains('wrapper exception', $output);
-        $this->assertContains('original cause', $output);
+        $this->assertStringContainsString('LogicException', $output);
+        $this->assertStringContainsString('RuntimeException', $output);
+        $this->assertStringContainsString('wrapper exception', $output);
+        $this->assertStringContainsString('original cause', $output);
 
         // Each frame has its own toggle container with a distinct id.
         if (preg_match_all('/dbgContainer_BugCatcher(\d+)/', $output, $matches)) {
@@ -73,9 +73,9 @@ class ErrorRenderTest extends TestCase
 
         $this->assertSame(3, substr_count($output, 'class="dbgHeader'));
         $this->assertSame(2, substr_count($output, 'caused-by'));
-        $this->assertContains('top', $output);
-        $this->assertContains('middle', $output);
-        $this->assertContains('root', $output);
+        $this->assertStringContainsString('top', $output);
+        $this->assertStringContainsString('middle', $output);
+        $this->assertStringContainsString('root', $output);
     }
 
     // --- report() / soft-exception registry ---
@@ -161,13 +161,13 @@ class ErrorRenderTest extends TestCase
         $rm->setAccessible(true);
         $output = $rm->invoke($instance);
 
-        $this->assertContains('class="dbgHeader reported"', $output,
+        $this->assertStringContainsString('class="dbgHeader reported"', $output,
             'soft block uses .reported CSS modifier');
-        $this->assertContains('Reported (non-fatal) [2]', $output,
+        $this->assertStringContainsString('Reported (non-fatal) [2]', $output,
             'header reports the count');
-        $this->assertContains('counter filter blew up', $output);
-        $this->assertContains('datum filter blew up', $output);
-        $this->assertContains('Reported:', $output,
+        $this->assertStringContainsString('counter filter blew up', $output);
+        $this->assertStringContainsString('datum filter blew up', $output);
+        $this->assertStringContainsString('Reported:', $output,
             'each frame is labelled "Reported:"');
     }
 
